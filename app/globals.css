@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    background: theme("colors.canvas.DEFAULT");
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: theme("height.nav");
+  }
+
+  body {
+    background: theme("colors.canvas.DEFAULT");
+    color: theme("colors.ink");
+    font-family: var(--font-body), system-ui, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display), system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: rgba(139, 92, 246, 0.4);
+    color: #fff;
+  }
+
+  /* One visible focus style everywhere. */
+  :focus-visible {
+    outline: 2px solid theme("colors.violet");
+    outline-offset: 3px;
+    border-radius: theme("borderRadius.sm");
+  }
+
+  /* Dark, unobtrusive scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.line.strong") transparent;
+  }
+
+  /* Native cursor is hidden only once HrixCursor has mounted on a
+     fine-pointer, motion-enabled desktop — see components/ui/HrixCursor.tsx.
+     Text selection and inputs keep their normal cursor regardless. */
+  .hrix-cursor-active,
+  .hrix-cursor-active a,
+  .hrix-cursor-active button {
+    cursor: none;
+  }
+  .hrix-cursor-active input,
+  .hrix-cursor-active textarea {
+    cursor: text;
+  }
+}
+
+@layer components {
+  .container-page {
+    width: 100%;
+    max-width: theme("maxWidth.page");
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .container-page {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* Hero and section headline scale. */
+  .text-display {
+    font-size: clamp(2.4rem, 6.6vw, 5.75rem);
+    line-height: 0.94;
+    font-weight: 800;
+    font-stretch: 76%;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+
+  .text-headline {
+    font-size: clamp(1.9rem, 4vw, 3.25rem);
+    line-height: 1.04;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .text-title {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .text-label {
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    font-weight: 500;
+    letter-spacing: 0.005em;
+  }
+}
+
+/* Honour reduced motion globally. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
