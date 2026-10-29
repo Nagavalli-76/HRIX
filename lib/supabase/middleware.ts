@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { AUTHORIZED_ADMIN_EMAIL } from "@/lib/admin-config";
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -44,7 +45,16 @@ export async function updateSession(request: NextRequest) {
       .select("role")
       .eq("id", user.id)
       .single();
-    role = profile?.role || "creator";
+    if (
+      profile?.role === "admin" &&
+      user.email?.toLowerCase() === AUTHORIZED_ADMIN_EMAIL
+    ) {
+      role = "admin";
+    } else if (profile?.role === "brand") {
+      role = "brand";
+    } else {
+      role = "creator";
+    }
   }
 
   return { supabaseResponse, user, role };

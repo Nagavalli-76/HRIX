@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { AUTHORIZED_ADMIN_EMAIL } from "@/lib/admin-config";
 
 export type UserRole = "creator" | "brand" | "admin";
 
@@ -7,6 +8,21 @@ export interface SessionUser {
   name: string;
   role: UserRole;
   email?: string;
+}
+
+export function isAuthorizedAdmin(session: SessionUser | null): boolean {
+  return isAuthorizedAdminRecord(session?.role, session?.email);
+}
+
+export function isAuthorizedAdminRecord(
+  role: string | null | undefined,
+  email: string | null | undefined,
+): boolean {
+  return (
+    role === "admin" &&
+    !!email &&
+    email.toLowerCase() === AUTHORIZED_ADMIN_EMAIL
+  );
 }
 
 /**
@@ -32,7 +48,10 @@ export async function getSession(): Promise<SessionUser | null> {
       .eq("id", user.id)
       .single();
 
-    const role = (profile?.role || "creator") as UserRole;
+    const role =
+      profile?.role === "admin" || profile?.role === "brand"
+        ? profile.role
+        : "creator";
     const name = profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "User";
 
     return {

@@ -20,9 +20,19 @@ import { colors } from "@/lib/design/tokens";
 import { ColorSwatchCard, AssetDownloadCard } from "@/components/brand/BrandSystemClient";
 
 export const metadata: Metadata = {
-  title: "Brand System",
+  title: "Brand System & Visual Guidelines · HRIX",
   description:
     "Official HRIX brand guidelines, design tokens, logo usage, color palette, and typography system.",
+  alternates: {
+    canonical: "/brand-system",
+  },
+  openGraph: {
+    title: "Brand System & Visual Guidelines · HRIX",
+    description:
+      "Official HRIX brand guidelines, design tokens, logo usage, color palette, and typography system.",
+    url: "https://hrixofficial.in/brand-system",
+    siteName: "HRIX",
+  },
 };
 
 const FOUNDATION_COLORS = [

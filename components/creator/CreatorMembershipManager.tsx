@@ -2,18 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ShieldCheck, AlertCircle, RefreshCw, Sparkles, Calendar } from "lucide-react";
+import { Check, ShieldCheck, AlertCircle, Calendar } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatDate, formatInr } from "@/lib/format";
 import { creatorPlans, type CreatorPlan } from "@/data/pricing";
-import {
-  subscribeCreatorMembership,
-  cancelCreatorMembership,
-  type AllowedCreatorPlanId,
-} from "@/lib/actions/creator-membership";
+import { cancelCreatorMembership } from "@/lib/actions/creator-membership";
 import type { Subscription } from "@/types";
+import { RazorpayCheckoutButton } from "@/components/payments/RazorpayCheckoutButton";
 
 interface Props {
   initialSubscription: Subscription;
@@ -35,35 +32,10 @@ const STATUS_LABEL = {
 
 export function CreatorMembershipManager({ initialSubscription }: Props) {
   const router = useRouter();
-  const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const isCurrentPlanActive = initialSubscription.status === "active" && !initialSubscription.isExpired;
-
-  async function handleSubscribe(plan: CreatorPlan) {
-    setSubscribingPlanId(plan.id);
-    setMessage(null);
-
-    try {
-      const res = await subscribeCreatorMembership(plan.id as AllowedCreatorPlanId);
-      if (res?.error) {
-        setMessage({ type: "error", text: res.error });
-      } else {
-        setMessage({
-          type: "success",
-          text: `Successfully activated ${res.planName}! Your membership is valid until ${
-            res.renewsOn ? formatDate(res.renewsOn) : "12 months from today"
-          }.`,
-        });
-        router.refresh();
-      }
-    } catch (err: any) {
-      setMessage({ type: "error", text: err?.message || "Failed to activate membership plan." });
-    } finally {
-      setSubscribingPlanId(null);
-    }
-  }
 
   async function handleCancel() {
     if (!confirm("Are you sure you want to cancel your creator membership?")) return;
@@ -178,7 +150,6 @@ export function CreatorMembershipManager({ initialSubscription }: Props) {
               isCurrentPlanActive &&
               (initialSubscription.planId === plan.id ||
                 initialSubscription.planName.toLowerCase() === plan.name.toLowerCase());
-            const isSubscribing = subscribingPlanId === plan.id;
             const isAnnual = plan.billingPeriod === "/year";
 
             return (
@@ -222,26 +193,11 @@ export function CreatorMembershipManager({ initialSubscription }: Props) {
                 </div>
 
                 <div className="mt-6 pt-2">
-                  <Button
-                    onClick={() => handleSubscribe(plan)}
-                    size="md"
-                    variant={isSelected ? "ghost" : isAnnual ? "primary" : "secondary"}
-                    disabled={isSubscribing || !!subscribingPlanId}
-                    className="w-full text-sm"
-                  >
-                    {isSubscribing ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Activating...
-                      </span>
-                    ) : isSelected ? (
-                      "Current Plan (Extend 1 Year)"
-                    ) : isAnnual ? (
-                      `Subscribe Annual (₹${plan.price}/year)`
-                    ) : (
-                      `Subscribe Entry (₹${plan.price}/mo)`
-                    )}
-                  </Button>
+                  <RazorpayCheckoutButton
+                    planId={plan.id}
+                    label={isSelected ? "Renew securely" : isAnnual ? `Subscribe Annual (₹${plan.price}/year)` : `Subscribe Entry (₹${plan.price}/mo)`}
+                    onComplete={() => router.refresh()}
+                  />
                 </div>
               </GlassCard>
             );

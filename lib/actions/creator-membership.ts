@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isAuthorizedAdminRecord } from "@/lib/api/auth";
 
 export type AllowedCreatorPlanId = "entry" | "profile-audit" | "creator-growth";
 
@@ -43,18 +44,14 @@ export async function subscribeCreatorMembership(
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile?.role !== "creator" && profile?.role !== "admin") {
+    const isAuthorizedAdmin = isAuthorizedAdminRecord(profile?.role, user.email);
+    if (profile?.role !== "creator" && !isAuthorizedAdmin) {
       return { error: "Creator membership plans are exclusively for creator accounts." };
     }
 
-    // Security Gate: In production, prevent client direct membership activation without payment confirmation
-    const allowDirectActivation =
-      process.env.ALLOW_DIRECT_MEMBERSHIP_ACTIVATION === "true" ||
-      process.env.NODE_ENV !== "production";
-
-    if (!allowDirectActivation && profile?.role !== "admin") {
+    if (!isAuthorizedAdmin) {
       return {
-        error: "Direct activation is disabled. Paid memberships require verified payment confirmation.",
+        error: "Paid memberships require verified Razorpay payment confirmation.",
       };
     }
 

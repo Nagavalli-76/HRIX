@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/Badge";
 import { TrustBadge } from "@/components/ui/TrustBadge";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CampaignCard } from "@/components/marketing/CampaignCard";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { getBreadcrumbSchema } from "@/lib/seo/schema";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -17,7 +19,31 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const brand = await getBrand(slug);
-  return { title: brand ? brand.name : "Brand" };
+  if (!brand) return { title: "Brand Not Found" };
+
+  const title = `${brand.name} · Verified Brand Profile | HRIX`;
+  const description = `Explore ${brand.name} (${brand.industry}) based in ${brand.city}. Discover active campaigns and creator collaboration opportunities on HRIX.`;
+
+  return {
+    title: {
+      absolute: title,
+    },
+    description,
+    alternates: {
+      canonical: `/brands/${brand.slug}`,
+    },
+    openGraph: {
+      title,
+      description,
+      url: `https://hrixofficial.in/brands/${brand.slug}`,
+      siteName: "HRIX",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+  };
 }
 
 export default async function BrandProfilePage({ params }: Props) {
@@ -28,8 +54,16 @@ export default async function BrandProfilePage({ params }: Props) {
   const allCampaigns = await listCampaigns();
   const brandCampaigns = allCampaigns.filter((campaign) => campaign.brandSlug === brand.slug);
 
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Brands", path: "/brands" },
+    { name: brand.name, path: `/brands/${brand.slug}` },
+  ]);
+
   return (
-    <div className="container-page py-16 md:py-20">
+    <>
+      <JsonLd data={breadcrumbSchema} />
+      <div className="container-page py-16 md:py-20">
       <section className="flex flex-col gap-6 border-b border-line/70 pb-10 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -91,5 +125,6 @@ export default async function BrandProfilePage({ params }: Props) {
         </aside>
       </div>
     </div>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isAuthorizedAdminRecord } from "@/lib/api/auth";
 
 export type BrandAccessDenialReason =
   | "unauthenticated"
@@ -51,7 +52,7 @@ export async function getBrandDirectoryAccessStatus(): Promise<BrandAccessStatus
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile?.role === "admin") {
+    if (isAuthorizedAdminRecord(profile?.role, user.email)) {
       return { allowed: true, role: "admin" };
     }
 

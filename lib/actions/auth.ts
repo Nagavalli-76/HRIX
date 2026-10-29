@@ -75,7 +75,11 @@ export async function signInAction(
     .select("role")
     .eq("id", data.user.id)
     .single();
-  const role = profile?.role || (data.user.user_metadata?.role as string) || "creator";
+  // Never use user-controlled Auth metadata for authorization decisions.
+  // The database trigger provisions only creator or brand profiles from signup.
+  const role = profile?.role === "brand" || profile?.role === "admin"
+    ? profile.role
+    : "creator";
 
   if (redirectTo && redirectTo.startsWith("/")) {
     redirect(redirectTo);

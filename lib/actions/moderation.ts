@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { sendModerationEmail } from "@/lib/email";
+import { AUTHORIZED_ADMIN_EMAIL } from "@/lib/admin-config";
 import type { ApplicationStatus, CampaignStatus, TrustState } from "@/types";
 
 type TargetType = "creator" | "brand" | "campaign" | "application";
@@ -13,14 +14,13 @@ async function requireAdmin() {
   if (authError || !authData.user) throw new Error("Authentication required.");
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role, email")
+    .select("role")
     .eq("id", authData.user.id)
     .maybeSingle();
   if (profileError) throw new Error("Unable to fetch profile.");
   if (profile?.role !== "admin") throw new Error("Admin authorization required.");
   // Ensure the admin email matches the authorized address
-  const authorizedEmail = process.env.HRIX_ADMIN_EMAIL || "hrixofficial@gmail.com";
-  if (profile?.email?.toLowerCase() !== authorizedEmail.toLowerCase()) {
+  if (authData.user.email?.toLowerCase() !== AUTHORIZED_ADMIN_EMAIL) {
     throw new Error("Admin email not authorized.");
   }
   return { supabase, userId: authData.user.id };

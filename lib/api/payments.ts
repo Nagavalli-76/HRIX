@@ -1,5 +1,6 @@
 import type { Invoice, Subscription } from "@/types";
 import { createClient } from "@/lib/supabase/server";
+import { isAuthorizedAdminRecord } from "@/lib/api/auth";
 
 export async function getSubscription(): Promise<Subscription> {
   const supabase = await createClient();
@@ -82,7 +83,12 @@ export async function listAllInvoicesForAdmin(): Promise<Invoice[]> {
     .select("role")
     .eq("id", userData.user.id)
     .single();
-  if (profileError || profile?.role !== "admin") throw new Error("Admin authorization required");
+  if (
+    profileError ||
+    !isAuthorizedAdminRecord(profile?.role, userData.user.email)
+  ) {
+    throw new Error("Admin authorization required");
+  }
 
   const { data, error } = await supabase
     .from("invoices")

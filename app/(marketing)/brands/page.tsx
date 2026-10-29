@@ -3,14 +3,36 @@ import { listBrands } from "@/lib/api/brands";
 import { BrandCard } from "@/components/marketing/BrandCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { getBreadcrumbSchema } from "@/lib/seo/schema";
 
-export const metadata: Metadata = { title: "For Brands" };
+export const metadata: Metadata = {
+  title: "Brands & Campaign Partners · HRIX",
+  description:
+    "Discover brands collaborating with verified creators on HRIX. Launch targeted influencer campaigns and manage collaborations effortlessly.",
+  alternates: {
+    canonical: "/brands",
+  },
+  openGraph: {
+    title: "Brands & Campaign Partners · HRIX",
+    description:
+      "Discover brands collaborating with verified creators on HRIX. Launch targeted influencer campaigns and manage collaborations effortlessly.",
+    url: "https://hrixofficial.in/brands",
+    siteName: "HRIX",
+  },
+};
 
 export default async function BrandsPage() {
   const brands = await listBrands();
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Brands", path: "/brands" },
+  ]);
 
   return (
-    <div className="container-page py-16 md:py-20">
+    <>
+      <JsonLd data={breadcrumbSchema} />
+      <div className="container-page py-16 md:py-20">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-headline">Brands on HRIX</h1>
@@ -34,5 +56,6 @@ export default async function BrandsPage() {
       </div>
       )}
     </div>
+    </>
   );
 }

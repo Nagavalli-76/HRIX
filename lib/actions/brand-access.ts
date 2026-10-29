@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isAuthorizedAdminRecord } from "@/lib/api/auth";
 
 export async function subscribeBrandAccess(planId: string = "brand-directory-access") {
   try {
@@ -22,18 +23,14 @@ export async function subscribeBrandAccess(planId: string = "brand-directory-acc
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile?.role !== "brand" && profile?.role !== "admin") {
+    const isAuthorizedAdmin = isAuthorizedAdminRecord(profile?.role, user.email);
+    if (profile?.role !== "brand" && !isAuthorizedAdmin) {
       return { error: "Brand directory access is exclusively for brand accounts." };
     }
 
-    // Security Gate: In production, prevent client direct access activation without payment confirmation
-    const allowDirectActivation =
-      process.env.ALLOW_DIRECT_MEMBERSHIP_ACTIVATION === "true" ||
-      process.env.NODE_ENV !== "production";
-
-    if (!allowDirectActivation && profile?.role !== "admin") {
+    if (!isAuthorizedAdmin) {
       return {
-        error: "Direct activation is disabled. Paid brand access requires verified payment confirmation.",
+        error: "Paid brand access requires verified Razorpay payment confirmation.",
       };
     }
 

@@ -4,11 +4,22 @@ import { getBrandDirectoryAccessStatus } from "@/lib/api/brand-access";
 import { CreatorCard } from "@/components/marketing/CreatorCard";
 import { LockedCreatorDirectory } from "@/components/brand/LockedCreatorDirectory";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { getBreadcrumbSchema } from "@/lib/seo/schema";
 import type { Category, City } from "@/types";
 
 export const metadata: Metadata = {
   title: "Discover Creators · HRIX",
   description: "Explore verified creator profiles and find the right partners for your brand campaigns.",
+  alternates: {
+    canonical: "/creators",
+  },
+  openGraph: {
+    title: "Discover Creators · HRIX",
+    description: "Explore verified creator profiles and find the right partners for your brand campaigns.",
+    url: "https://hrixofficial.in/creators",
+    siteName: "HRIX",
+  },
 };
 
 export const dynamic = "force-dynamic";

@@ -2,8 +2,24 @@ import type { Metadata } from "next";
 import { Check, Minus } from "lucide-react";
 import { PricingTiers } from "@/components/marketing/PricingTiers";
 import { creatorPlans } from "@/data/pricing";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { getBreadcrumbSchema } from "@/lib/seo/schema";
 
-export const metadata: Metadata = { title: "Pricing" };
+export const metadata: Metadata = {
+  title: "Creator Membership & Pricing Plans · HRIX",
+  description:
+    "Affordable creator membership plans starting from ₹99/month. Build a verified profile, receive bio and portfolio optimization, and unlock brand partnership access.",
+  alternates: {
+    canonical: "/pricing",
+  },
+  openGraph: {
+    title: "Creator Membership & Pricing Plans · HRIX",
+    description:
+      "Affordable creator membership plans starting from ₹99/month. Build a verified profile, receive bio and portfolio optimization, and unlock brand partnership access.",
+    url: "https://hrixofficial.in/pricing",
+    siteName: "HRIX",
+  },
+};
 
 const COMPARISON_ROWS: { label: string; values: [boolean, boolean, boolean] }[] = [
   { label: "Creator registration & profile setup", values: [true, true, true] },
@@ -18,8 +34,15 @@ const COMPARISON_ROWS: { label: string; values: [boolean, boolean, boolean] }[] 
 ];
 
 export default function PricingPage() {
+  const breadcrumbSchema = getBreadcrumbSchema([
+    { name: "Home", path: "/" },
+    { name: "Pricing", path: "/pricing" },
+  ]);
+
   return (
-    <div className="container-page py-16 md:py-24">
+    <>
+      <JsonLd data={breadcrumbSchema} />
+      <div className="container-page py-16 md:py-24">
       <div className="mx-auto max-w-2xl text-center">
         <h1 className="text-display">Choose how you want to grow with HRIX</h1>
         <p className="mt-4 text-muted">
@@ -77,5 +100,6 @@ export default function PricingPage() {
         </p>
       </div>
     </div>
+    </>
   );
 }

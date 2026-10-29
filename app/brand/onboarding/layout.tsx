@@ -1,4 +1,13 @@
+import type { Metadata } from "next";
 import { HrixLogo } from "@/components/brand/HrixLogo";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+  title: "Brand Onboarding",
+};
 
 export default function BrandOnboardingLayout({
   children,

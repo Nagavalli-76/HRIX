@@ -1,285 +1,70 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import crypto from "node:crypto";
+import { verifyRazorpayWebhookSignature } from "@/lib/payments/razorpay";
 
 export const dynamic = "force-dynamic";
 
-interface WebhookPayload {
-  eventId?: string;
-  eventType:
-    | "payment.succeeded"
-    | "payment.failed"
-    | "subscription.activated"
-    | "subscription.canceled"
-    | "subscription.expired"
-    | "invoice.paid"
-    | "invoice.payment_failed";
-  userId: string;
-  planId?: string;
-  amountInr?: number;
-  paymentId?: string;
-  description?: string;
-  timestamp?: string;
-}
-
-/**
- * Validates webhook authentication using constant-time string comparison.
- * Requires PAYMENT_WEBHOOK_SECRET to be configured on the server.
- * Never falls back to database service role keys or allows unauthenticated execution.
- */
-function verifyWebhookAuth(request: NextRequest): { valid: boolean; reason?: string } {
-  const webhookSecret = process.env.PAYMENT_WEBHOOK_SECRET;
-
-  if (!webhookSecret) {
-    console.error("PAYMENT_WEBHOOK_SECRET is not configured on the server.");
-    return { valid: false, reason: "Server configuration error: PAYMENT_WEBHOOK_SECRET is missing." };
-  }
-
-  const authHeader =
-    request.headers.get("x-webhook-secret") ||
-    request.headers.get("x-payment-signature") ||
-    request.headers.get("authorization");
-
-  if (!authHeader) {
-    return { valid: false, reason: "Missing authentication header." };
-  }
-
-  const providedSecret = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-  // Timing-safe comparison to prevent timing side-channel attacks
+export async function POST(request: Request) {
+  const rawBody = await request.text();
+  const signature = request.headers.get("x-razorpay-signature");
+  if (!signature) return NextResponse.json({ error: "Missing webhook signature." }, { status: 401 });
   try {
-    const expectedBuffer = Buffer.from(webhookSecret);
-    const providedBuffer = Buffer.from(providedSecret);
-
-    if (expectedBuffer.length !== providedBuffer.length) {
-      return { valid: false, reason: "Invalid signature length." };
+    if (!verifyRazorpayWebhookSignature(rawBody, signature)) {
+      return NextResponse.json({ error: "Invalid webhook signature." }, { status: 401 });
     }
-
-    const match = crypto.timingSafeEqual(expectedBuffer, providedBuffer);
-    return { valid: match, reason: match ? undefined : "Invalid webhook secret." };
-  } catch {
-    return { valid: false, reason: "Error validating webhook credentials." };
-  }
-}
-
-/**
- * Server-side payment webhook handler.
- * Reuses the existing Supabase payment system of record:
- * - Enforces server-side authentication with timing-safe comparison
- * - Idempotently handles duplicate webhook events via eventId AND paymentId checks
- * - Prevents multiple billings or duplicate membership extensions
- * - Updates user_subscriptions and invoices with strict status transitions
- * - Never exposes service-role keys or payment secrets
- */
-export async function POST(request: NextRequest) {
-  try {
-    // 1. Strict Authorization verification (fails closed if secret is missing or invalid)
-    const authResult = verifyWebhookAuth(request);
-    if (!authResult.valid) {
-      const isMissingConfig = authResult.reason?.includes("Server configuration error");
-      return NextResponse.json(
-        { error: isMissingConfig ? "Webhook endpoint not configured." : "Unauthorized: Invalid payment credentials." },
-        { status: isMissingConfig ? 500 : 401 }
-      );
+    const payload = JSON.parse(rawBody) as {
+      event?: string;
+      payload?: {
+        payment?: {
+          entity?: {
+            id?: string;
+            order_id?: string;
+            amount?: number;
+            currency?: string;
+            status?: string;
+            error_description?: string;
+          };
+        };
+      };
+    };
+    const payment = payload.payload?.payment?.entity;
+    const eventId = request.headers.get("x-razorpay-event-id")?.trim();
+    if (!eventId || eventId.length > 200 || !/^[A-Za-z0-9._:-]+$/.test(eventId) || !payload.event) {
+      return NextResponse.json({ error: "Webhook event identifier and type are required." }, { status: 400 });
     }
-
-    // 2. Parse payload safely
-    let body: WebhookPayload;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    if (!["payment.captured", "payment.failed"].includes(payload.event)) {
+      return NextResponse.json({ received: true, ignored: true });
     }
-
-    const { eventType, eventId, userId, planId, amountInr, paymentId, description } = body;
-
-    if (!eventType || !userId) {
-      return NextResponse.json(
-        { error: "Missing required fields: eventType and userId are mandatory." },
-        { status: 400 }
-      );
+    if (!payment?.id || !payment.order_id || typeof payment.amount !== "number" || payment.currency !== "INR") {
+      return NextResponse.json({ error: "Invalid payment webhook payload." }, { status: 400 });
     }
-
-    const adminSupabase = createAdminClient();
-
-    // 3. Comprehensive Idempotency Check:
-    // Check both eventId and paymentId to ensure duplicate events cannot create duplicate invoices
-    // or extend memberships twice.
-    const idempotencyKey = eventId || paymentId;
-    if (idempotencyKey) {
-      const { data: existingAudit } = await adminSupabase
-        .from("admin_audit_logs")
-        .select("id, details")
-        .eq("target_type", "webhook_event")
-        .eq("target_id", idempotencyKey)
-        .maybeSingle();
-
-      if (existingAudit) {
-        return NextResponse.json(
-          {
-            received: true,
-            status: "duplicate",
-            message: `Event/Payment '${idempotencyKey}' has already been processed.`,
-          },
-          { status: 200 }
-        );
-      }
+    const admin = createAdminClient();
+    const { data: order, error: orderError } = await admin.from("payment_orders").select("id, amount_paise").eq("razorpay_order_id", payment.order_id).single();
+    if (orderError || !order || order.amount_paise !== payment.amount) {
+      return NextResponse.json({ error: "Webhook payment does not match a trusted order." }, { status: 400 });
     }
-
-    // 4. Handle events
-    switch (eventType) {
-      case "payment.succeeded":
-      case "subscription.activated":
-      case "invoice.paid": {
-        const targetPlanId = planId || "entry";
-
-        // Query plan metadata
-        const { data: plan, error: planError } = await adminSupabase
-          .from("subscription_plans")
-          .select("id, name, price, duration_days")
-          .eq("id", targetPlanId)
-          .maybeSingle();
-
-        if (planError || !plan) {
-          return NextResponse.json(
-            { error: `Plan '${targetPlanId}' not recognized.` },
-            { status: 400 }
-          );
-        }
-
-        const durationDays = plan.duration_days ?? (targetPlanId === "entry" ? 30 : 365);
-        const renewsOn = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
-        const paidAmount = amountInr ?? plan.price;
-
-        // Upsert active subscription with explicit renews_on expiration date
-        const { error: subError } = await adminSupabase
-          .from("user_subscriptions")
-          .upsert(
-            {
-              user_id: userId,
-              plan_id: plan.id,
-              status: "active",
-              renews_on: renewsOn,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,plan_id" }
-          );
-
-        if (subError) {
-          console.error("Webhook: Failed to upsert subscription:", subError);
-          return NextResponse.json(
-            { error: "Failed to update user subscription status." },
-            { status: 500 }
-          );
-        }
-
-        // Record paid invoice
-        const invoiceDescription =
-          description ||
-          `${plan.name} (${durationDays >= 365 ? "Annual Subscription · 12 Months" : "Monthly Membership · 30 Days"})`;
-
-        await adminSupabase.from("invoices").insert({
-          user_id: userId,
-          description: invoiceDescription,
-          amount_inr: paidAmount,
-          status: "paid",
-          issued_on: new Date().toISOString().split("T")[0],
-        });
-
-        // Record audit event for strict idempotency
-        if (idempotencyKey) {
-          await adminSupabase.from("admin_audit_logs").insert({
-            action: `payment_processed:${eventType}`,
-            target_type: "webhook_event",
-            target_id: idempotencyKey,
-            details: {
-              userId,
-              planId: plan.id,
-              amount: paidAmount,
-              paymentId,
-              eventId,
-            },
-          });
-        }
-
-        return NextResponse.json(
-          {
-            received: true,
-            status: "active",
-            plan: plan.name,
-            renewsOn,
-          },
-          { status: 200 }
-        );
-      }
-
-      case "payment.failed":
-      case "invoice.payment_failed": {
-        // Record failed invoice
-        await adminSupabase.from("invoices").insert({
-          user_id: userId,
-          description: description || `Payment attempt failed (${planId || "membership"})`,
-          amount_inr: amountInr ?? 0,
-          status: "failed",
-          issued_on: new Date().toISOString().split("T")[0],
-        });
-
-        if (idempotencyKey) {
-          await adminSupabase.from("admin_audit_logs").insert({
-            action: `payment_failed:${eventType}`,
-            target_type: "webhook_event",
-            target_id: idempotencyKey,
-            details: { userId, planId, paymentId, eventId },
-          });
-        }
-
-        return NextResponse.json(
-          {
-            received: true,
-            status: "failed_recorded",
-            message: "Failed payment recorded. Subscription access not granted.",
-          },
-          { status: 200 }
-        );
-      }
-
-      case "subscription.canceled": {
-        await adminSupabase
-          .from("user_subscriptions")
-          .update({ status: "canceled", updated_at: new Date().toISOString() })
-          .eq("user_id", userId)
-          .eq("status", "active");
-
-        return NextResponse.json(
-          { received: true, status: "canceled" },
-          { status: 200 }
-        );
-      }
-
-      case "subscription.expired": {
-        await adminSupabase
-          .from("user_subscriptions")
-          .update({ status: "past-due", updated_at: new Date().toISOString() })
-          .eq("user_id", userId)
-          .eq("status", "active");
-
-        return NextResponse.json(
-          { received: true, status: "expired" },
-          { status: 200 }
-        );
-      }
-
-      default:
-        return NextResponse.json(
-          { error: `Unhandled event type: ${eventType}` },
-          { status: 400 }
-        );
+    if (payload.event === "payment.failed") {
+      const { error } = await admin.rpc("mark_razorpay_payment_failed", {
+        p_order_id: order.id, p_payment_id: payment.id, p_amount_paise: payment.amount, p_currency: payment.currency,
+        p_failure_reason: payment.error_description || "Razorpay reported payment.failed",
+      });
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await admin.rpc("finalize_razorpay_payment", {
+        p_order_id: order.id, p_payment_id: payment.id, p_signature: null,
+        p_webhook_signature: signature, p_verification_source: "webhook",
+        p_amount_paise: payment.amount, p_currency: payment.currency,
+      });
+      if (error) throw new Error(error.message);
     }
-  } catch (err: any) {
-    console.error("Webhook processing error:", err);
-    return NextResponse.json(
-      { error: "Internal server error during webhook processing." },
-      { status: 500 }
-    );
+    const { error: eventError } = await admin.from("payment_webhook_events").insert({
+      event_id: eventId, event_type: payload.event, payload,
+    });
+    if (eventError?.code === "23505") return NextResponse.json({ received: true, duplicate: true });
+    if (eventError) throw new Error(eventError.message);
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error("Razorpay webhook processing failed:", error);
+    return NextResponse.json({ error: "Webhook verification or processing failed." }, { status: 400 });
   }
 }

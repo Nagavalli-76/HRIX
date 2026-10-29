@@ -66,7 +66,7 @@ export function HrixLogo({
   const image = (
     <Image
       src={LOGO_SRC}
-      alt={href ? "" : "HRIX"}
+      alt="HRIX - The Creator × Brand Growth Network"
       width={LOGO_WIDTH}
       height={LOGO_HEIGHT}
       priority={priority}

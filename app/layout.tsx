@@ -24,11 +24,49 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL || "https://hrixofficial.in"
   ),
   title: {
-    default: "HRIX | The Creator × Brand Growth Network",
+    default: "HRIX | Branding, Digital Marketing & Influencer Agency",
     template: "%s | HRIX",
   },
   description:
-    "HRIX connects brands with the right creators and manages the journey from discovery to collaboration.",
+    "HRIX helps businesses grow through branding, influencer collaborations, digital marketing, paid advertising, lead generation, and business automation.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "HRIX | Branding, Digital Marketing & Influencer Agency",
+    description:
+      "HRIX helps businesses grow through branding, influencer collaborations, digital marketing, paid advertising, lead generation, and business automation.",
+    url: "https://hrixofficial.in",
+    siteName: "HRIX",
+    locale: "en_IN",
+    type: "website",
+    images: [
+      {
+        url: "/hrix-logo.png",
+        width: 1200,
+        height: 630,
+        alt: "HRIX - Branding, Digital Marketing & Influencer Agency",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "HRIX | Branding, Digital Marketing & Influencer Agency",
+    description:
+      "HRIX helps businesses grow through branding, influencer collaborations, digital marketing, paid advertising, lead generation, and business automation.",
+    images: ["/hrix-logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export const viewport: Viewport = {

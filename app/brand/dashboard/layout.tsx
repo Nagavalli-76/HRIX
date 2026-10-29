@@ -1,8 +1,17 @@
+import type { Metadata } from "next";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { brandNav } from "@/lib/dashboard-nav";
 import { listNotifications } from "@/lib/api/notifications";
 import { getSession } from "@/lib/api/auth";
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+  title: "Brand Dashboard",
+};
 
 export default async function BrandDashboardLayout({
   children,

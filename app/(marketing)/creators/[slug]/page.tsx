@@ -20,8 +20,13 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const creator = await getCreator(slug);
-  // Do not expose creator name in metadata to unauthorized viewers
-  return { title: creator ? `${creator.name} · Creator Profile` : "Discover Creators · HRIX" };
+  const title = creator ? `${creator.name} · Creator Profile | HRIX` : "Discover Creators · HRIX";
+  return {
+    title,
+    alternates: {
+      canonical: `/creators/${slug}`,
+    },
+  };
 }
 
 export default async function CreatorProfilePage({ params }: Props) {
